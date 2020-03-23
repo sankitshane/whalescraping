@@ -1,7 +1,56 @@
 import scrapy
 
-class plantsdata(scrapy.Spider):
-    name = "plants"
+class plantsAquabyNature(scrapy.Spider):
+    name = "plantsAqua"
+
+    start_urls = [
+        'https://aquabynature-shop.com/59-aquatic-plants'
+    ]
+
+    def parse(self, response):
+        visited = {}
+        for plantlink in response.css('a.product-name'):
+            title = plantlink.css('a::attr(title)').get().split('-')[0]
+            link = plantlink.css('a::attr(href)').get()
+
+            if title not in visited:
+                visited[title] = True
+            else:
+                continue
+
+            if link is not None:
+                yield response.follow(plantlink, callback=self.parseMore)
+            
+        
+        next_page = response.css('li#pagination_next_bottom').css('a::attr(href)').get()
+
+        if next_page is not None:
+            yield response.follow(next_page, callback=self.parse)
+
+    def parseMore(self, response):
+        item = response.css('div.pb-center-column')
+
+        name = item.css('h1::text').get().split('-')[0].strip()
+
+        stats = {}
+
+        for stat in item.css('div#short_description_content').css('p'):
+            strongitem = stat.css('strong::text').getall()
+            pitem = stat.css('p::text').getall()
+
+            for i in range(len(pitem)):
+                try:
+                    stats[strongitem[i][:-1].strip()] = pitem[i].strip()
+                except:
+                    yield {"Error": name}
+
+        yield {
+            'Category': name,
+            'Stats': stats
+        }
+
+class plantsTropica(scrapy.Spider):
+    name = "plantsTropica"
 
     start_urls = [
         'https://tropica.com/en/plants/'
