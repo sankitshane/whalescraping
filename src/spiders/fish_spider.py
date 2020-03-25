@@ -1,5 +1,72 @@
 import scrapy
 
+class fishAquaHobby(scrapy.Spider):
+    name = 'fishAquahobby'
+
+    start_urls = [
+        'http://www.aquahobby.com/e_freshwater_tropical_aquarium_fish.php',
+        'http://www.aquahobby.com/e_cyprinids.php',
+        'http://www.aquahobby.com/e_characins.php,',
+        'http://www.aquahobby.com/e_american_cichlids.php',
+        'http://www.aquahobby.com/e_african_cichlids.php',
+        'http://www.aquahobby.com/e_plecos_catfishes.php'
+
+    ]
+
+    def parse(self, response):
+        for link in response.css('li').css('a::attr(href)').getall():
+            if link is not None:
+                yield response.follow(link, callback=self.parseMore, cb_kwargs=dict(parentalData=None))
+        
+    def parseMore(self, response, parentalData):
+        try:
+            category = response.css('span.maintitle::text').get()
+
+            if parentalData is None:
+                comments = []
+                stats = {}
+            else:
+                comments = parentalData['Comments']
+                stats = parentalData['Stats']
+
+            for values in response.css('span.postbody').css('p'):
+                if values.css('p::attr(align)').get() == 'justify':
+                    comment = values.css('p::text').getall()
+                    commentedit = ' '.join(com.strip() for com in comment)
+                    comments.append(commentedit)
+                else:
+                    t1, t2 = response.css('table.profiles').css('tr')[-2:]
+                    keys = t1.css('td').css('b::text').getall()[1:]
+                    values = []
+                    for td in t2.css('td'):
+                        if td.css('td::attr(align)').get() == "center":
+                            values.append(td.css('td::text').get())
+                    
+                    for i in range(len(keys)):
+                        stats[keys[i].strip()] = values[i].strip()
+
+
+            data = {
+                'Category': category,
+                'Comments': comments,
+                'Stats' : stats
+            }
+
+            pages = response.css('span.lnav').css('a::text').getall()
+            nextpage = None
+
+            for i in range(1,len(pages)+1):
+                if str(i) != pages[i-1]:
+                    nextpage = response.css('span.lnav').css('a::attr(href)').getall()[i-1]
+                    break
+            
+            if nextpage is not None:
+                yield response.follow(nextpage, callback=self.parseMore, cb_kwargs=dict(parentalData=data))
+            else:
+                yield data
+        except Exception as e:
+            yield {"Error": response, "WITH": e}
+
 class plantsAquabyNature(scrapy.Spider):
     name = "plantsAqua"
 
